@@ -3,10 +3,8 @@ import {MenuMiddleware} from 'telegraf-inline-menu';
 import {Telegraf} from 'telegraf';
 import TelegrafSessionLocal from 'telegraf-session-local';
 
-import {helpHandler, tipHandler, withdrawHandler, accountHandler} from './handlers.js';
 import {MyContext} from './my-context.js';
-
-import {menu} from './menu/index.js';
+import {menu} from './menu.js';
 
 const token = process.env['BOT_TOKEN'];
 if (!token) {
@@ -34,10 +32,14 @@ bot.use(async (ctx, next) => {
   
 // commands
 bot.command('start', async context => menuMiddleware.replyToContext(context));
-bot.command('help', async context => helpHandler(context));
-bot.command('tip', async context => tipHandler(context));
-bot.command('withdraw', async context => withdrawHandler(context));
-bot.command('account', async context => accountHandler(context));
+bot.command('help', async context => {
+	var params = context.message.text.split(" ");
+	console.log(params);
+	return context.reply("hello");
+});
+// bot.command('tip', async context => return context.reply('hello'));
+// bot.command('withdraw', async context => return context.reply('hello'));
+// bot.command('account', async context => return context.reply('hello'));
 
 bot.catch(error => {
 	console.error('telegraf error occured', error);

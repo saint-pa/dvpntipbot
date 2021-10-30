@@ -1,6 +1,6 @@
 import {MenuTemplate} from 'telegraf-inline-menu';
 
-import {MyContext} from '../my-context.js';
+import {MyContext} from './my-context.js';
 
 
 export const menu = new MenuTemplate<MyContext>('welcome to dvpntipbot');
