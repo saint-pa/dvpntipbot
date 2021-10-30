@@ -9,7 +9,7 @@ updates:
     schedule:
       # When these pull requests are annoying long term switch from "weekly" to "monthly".
       # Less often but still automated checks.
-      interval: "weekly"
+      interval: "monthly"
       time: "03:37" # UTC
     versioning-strategy: increase-if-necessary
     commit-message:
@@ -21,6 +21,6 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     commit-message:
       prefix: "ci(actions):"
