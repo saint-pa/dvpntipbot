@@ -1,17 +1,15 @@
 import {generateUpdateMiddleware} from 'telegraf-middleware-console-time';
-import {I18n} from '@grammyjs/i18n';
 import {MenuMiddleware} from 'telegraf-inline-menu';
 import {Telegraf} from 'telegraf';
 import TelegrafSessionLocal from 'telegraf-session-local';
 
-import {fightDragons, danceWithFairies} from '../magic/index.js';
 
 import {MyContext} from './my-context.js';
 import {menu} from './menu/index.js';
 
 const token = process.env['BOT_TOKEN'];
 if (!token) {
-	throw new Error('You have to provide the bot-token from @BotFather via environment variable (BOT_TOKEN)');
+	throw new Error('BOT_TOKEN environment variable not present');
 }
 
 const bot = new Telegraf<MyContext>(token);
@@ -22,37 +20,28 @@ const localSession = new TelegrafSessionLocal({
 
 bot.use(localSession.middleware());
 
-const i18n = new I18n({
-	directory: 'locales',
-	defaultLanguage: 'en',
-	defaultLanguageOnMissing: true,
-	useSession: true,
-});
-
-bot.use(i18n.middleware());
-
 if (process.env['NODE_ENV'] !== 'production') {
 	// Show what telegram updates (messages, button clicks, ...) are happening (only in development)
 	bot.use(generateUpdateMiddleware());
 }
 
-bot.command('help', async context => context.reply(context.i18n.t('help')));
+bot.command('help', async context => context.reply('this is some help'));
 
-bot.command('magic', async context => {
-	const combatResult = fightDragons();
-	const fairyThoughts = danceWithFairies();
-
-	let text = '';
-	text += combatResult;
-	text += '\n\n';
-	text += fairyThoughts;
-
-	return context.reply(text);
+bot.command('withdraw', async context => {
+	return context.reply('withdraw');
+});
+bot.command('account', async context => {
+	return context.reply('account');
+});
+bot.command('balance', async context => {
+	return context.reply('balance');
+});
+bot.command('tip', async context => {
+	return context.reply('tip');
 });
 
 const menuMiddleware = new MenuMiddleware('/', menu);
 bot.command('start', async context => menuMiddleware.replyToContext(context));
-bot.command('settings', async context => menuMiddleware.replyToContext(context, '/settings/'));
 bot.use(menuMiddleware.middleware());
 
 bot.catch(error => {
@@ -63,9 +52,11 @@ export async function start(): Promise<void> {
 	// The commands you set here will be shown as /commands like /start or /magic in your telegram client.
 	await bot.telegram.setMyCommands([
 		{command: 'start', description: 'open the menu'},
-		{command: 'magic', description: 'do magic'},
-		{command: 'help', description: 'show the help'},
-		{command: 'settings', description: 'open the settings'},
+		{command: 'tip', description: 'tip someone'},
+		{command: 'withdraw', description: 'withdraw balance'},
+		{command: 'account', description: 'account details'},
+		{command: 'balance', description: 'check balance'},
+		{command: 'register', description: 'resgister account'},
 	]);
 
 	await bot.launch();
