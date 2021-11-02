@@ -52,3 +52,5 @@ export async function transferTokens(senderUsername: string, recipientAddress: s
     const result = await stargateClient.sendTokens(account!.address, recipientAddress, [amount], fee, "Transfered using @dvpntipbot");
     return result;
 }
+
+
