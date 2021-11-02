@@ -10,6 +10,13 @@ services:
       - REDIS_PASSWORD=$REDIS_PASSWORD
     volumes:
       - redis-data:/data
+  
+  bot:
+    build: .
+    command: npm run start
+    environment:
+      - BOT_TOKEN=$BOT_TOKEN
+      - REDIS_URI=$REDIS_URI
 
 volumes:
   redis-data:

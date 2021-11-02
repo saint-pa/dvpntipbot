@@ -10,6 +10,3 @@ Dockerfile
 install-systemd.sh
 node_modules
 test
-
-# botfiles
-persist
