@@ -6,6 +6,3 @@ node_modules
 yarn.lock
 .env
 .vscode
-
-# botfiles
-persist
