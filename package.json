@@ -12,19 +12,23 @@
 		"node": ">=14"
 	},
 	"dependencies": {
+		"@cosmjs/proto-signing": "^0.26.4",
+		"@cosmjs/stargate": "^0.26.4",
 		"@grammyjs/i18n": "^0.3.0",
+		"dotenv": "^10.0.0",
 		"source-map-support": "^0.5.19",
 		"telegraf": "^4.0.0",
 		"telegraf-inline-menu": "^6.0.0",
 		"telegraf-middleware-console-time": "^2.0.0",
-		"telegraf-session-local": "^2.0.0"
+		"telegraf-session-local": "^2.0.0",
+		"typestub-node-lmdb": "^1.0.0"
 	},
 	"devDependencies": {
 		"@sindresorhus/tsconfig": "^2.0.0",
 		"@types/node": "^14.17.9",
 		"ava": "^3.0.0",
 		"del-cli": "^4.0.0",
-		"ts-node": "^10.0.0",
+		"ts-node": "^10.4.0",
 		"typescript": "^4.2.3",
 		"xo": "^0.45.0"
 	},
