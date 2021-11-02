@@ -2,9 +2,7 @@ import {newEnv, Txn, Dbi} from 'typestub-node-lmdb'
 import path from 'path';
 
 export function getDB() {
-    // var env = new lmdb.Env();
     const __dirname = path.resolve()
-    console.log(__dirname+"/persist/data")
     const env = newEnv().open({
         path: __dirname+"/persist",
         mapSize: 2*1024*1024*1024, // maximum database size

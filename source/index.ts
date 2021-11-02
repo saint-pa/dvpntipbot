@@ -3,7 +3,7 @@ import {MenuMiddleware} from 'telegraf-inline-menu';
 import {Telegraf} from 'telegraf';
 import {MyContext} from './my-context.js';
 import {menu} from './menu.js';
-import {getAccount, getBalance, register, tip} from './utils.js'
+import {getAccount, getBalance, register, tip, withdraw} from './utils.js'
 import {getDB,saveTX} from './db.js'
 import * as dotenv from 'dotenv';
 dotenv.config();
@@ -27,19 +27,19 @@ bot.use(async (ctx, next) => {
 		return
 	}
 
-	const { env, dbi } = getDB();
-	const txn = env.beginTxn()
-
 	const registered_commands = ['/tip', '/account', '/balance', '/withdraw']
 	if(registered_commands.includes((ctx.message as any).text?.split(' ')[0])){
-		console.log(txn.getString(dbi,ctx.message.from.username))
-		if (txn.getString(dbi,ctx.message.from.username) === null){
+		const { env, dbi } = getDB();
+		const txn = env.beginTxn()
+		const userKey = txn.getString(dbi,ctx.message.from.username)
+		saveTX(txn, dbi, env)
+
+		if (userKey === null){
 			ctx.replyWithMarkdown(`You are not registered. Use /register command to open a free account first.`)
-			saveTX(txn, dbi, env)
 			return
 		}
 	}
-	saveTX(txn, dbi, env)
+
 	await next();
 })
 
@@ -51,7 +51,7 @@ bot.command('help', async context => {
 		/account : Get account address\n
 		/balance : Get account balance\n
 		/tip \`tip_amount\` \`@user\` : Tip user\n
-		/withdraw \`address\` : Withdraw available balace to address\n
+		/withdraw \`address\` : Withdraw available balance to address\n
 	`)
 });
 bot.command('tip', async context => {
@@ -60,22 +60,22 @@ bot.command('tip', async context => {
 bot.command('register', async context => {
 	const { env, dbi } = getDB();
 	const txn = env.beginTxn()
+	const userKey = txn.getString(dbi,context.message.from.username!)
+	saveTX(txn, dbi, env)
 
-	if (txn.getString(dbi,context.message.from.username!)){
+	if (userKey){
 		const wallet = await getAccount(context.message.from.username!)
 		const [account] = await wallet.getAccounts();
 		context.replyWithMarkdown(`Your account address is \`${account!.address}\``)
-		saveTX(txn, dbi, env)
 		return
 	}
-	saveTX(txn, dbi, env)
 
 	const wallet = await register(context.message.from.username!)
 	const [account] = await wallet!.getAccounts();
 	context.replyWithMarkdown(`Successfully registered. Your account address is: \`${account!.address}\`. For further use refer \`/help\` command.`)
 
 })
-// bot.command('withdraw', async context => return context.reply('hello'));
+bot.command('withdraw', async context => {withdraw(context)});
 
 bot.command('account', async context => {
 	const wallet = await getAccount(context.message?.from?.username!)
