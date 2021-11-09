@@ -1,4 +1,4 @@
-import client from './redisClient.js'
+import redisClient from './redisClient.js'
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 import { SigningStargateClient } from "@cosmjs/stargate";
 
@@ -8,13 +8,13 @@ let udvpnToDvpn = (udvpn:string) => (Number(udvpn)/1000000).toFixed(6)
 export async function createAccount(username: string) {
     const wallet = await DirectSecp256k1HdWallet.generate();
     const mnemonic = wallet.mnemonic;
-    client.set(username, mnemonic);
+    redisClient.set(username, mnemonic);
     const address = (await getAccount(username))!.address;
     return {address, mnemonic};
 }
 
 export async function getAccount(username: string) {
-    const mnemonic = await client.get(username);
+    const mnemonic = await redisClient.get(username);
     if(mnemonic == null){
         return null;
     }
@@ -31,7 +31,7 @@ export async function getBalance(username: string) {
 }
 
 export async function transferTokens(senderUsername: string, recipientAddress: string, tokens: number){
-    const mnemonic = await client.get(senderUsername);
+    const mnemonic = await redisClient.get(senderUsername);
     const wallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic!, {prefix:"sent"});
     const account = await getAccount(senderUsername);
     const stargateClient = await SigningStargateClient.connectWithSigner(RPC_ENDPOINT, wallet);

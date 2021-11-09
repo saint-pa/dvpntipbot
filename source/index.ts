@@ -1,9 +1,10 @@
 import {generateUpdateMiddleware} from 'telegraf-middleware-console-time';
 import {MenuMiddleware} from 'telegraf-inline-menu';
-import {Telegraf} from 'telegraf';
+import {Telegraf, Markup} from 'telegraf';
 import {menu} from './menu.js';
 import {getAccount, createAccount, getBalance, transferTokens} from './utils.js'
 import * as dotenv from 'dotenv';
+import redisClient from './redisClient.js';
 dotenv.config();
 
 const token = process.env['BOT_TOKEN'];
@@ -19,17 +20,19 @@ const menuMiddleware = new MenuMiddleware('/', menu);
 bot.use(menuMiddleware.middleware());
 bot.use(generateUpdateMiddleware());
 bot.use(async (ctx, next) => {
-	if(ctx.message?.from.username == undefined){
-		ctx.reply("Your account needs a username for tipping. Please add a username to continue.");
-		return
-	}
-
-	const registered_commands = ['/tip', '/account', '/balance', '/withdraw']
-	if(registered_commands.includes((ctx.message as any).text?.split(' ')[0])){
-		const account = await getAccount(ctx.message.from.username);
-		if (account == null){
-			ctx.replyWithMarkdown(`You are not registered. Use /register to open an account.`)
+	if (ctx.message){
+		if(ctx.message.from.username == undefined){
+			ctx.reply("Your account needs a username for tipping. Please add a username to continue.");
 			return
+		}
+	
+		const registered_commands = ['/tip', '/account', '/balance', '/withdraw', '/tipall']
+		if(registered_commands.includes((ctx.message as any).text?.split(' ')[0])){
+			const account = await getAccount(ctx.message.from.username);
+			if (account == null){
+				ctx.replyWithMarkdown(`You are not registered. Use /register to open an account.`)
+				return
+			}
 		}
 	}
 	await next();
@@ -43,7 +46,8 @@ bot.command('help', async context => {
 		/account : Get account address\n
 		/balance : Get account balance\n
 		/tip \`<tip_amount>\` \`<@user>\` : Tip user\n
-		/withdraw \`<withdraw_amount>\` \`<address>\` : Withdraw available balace to address\n
+		/tipall \`<tip_amount>\` \`<timeout hh(:mm)(:ss) {default=24:00:00}>\` : Tip everyone in the group. Creates a button for claiming. \n
+		/withdraw \`<withdraw_amount>\` \`<address>\` : Withdraw available balance to address\n
 	`)
 });
 
@@ -58,7 +62,6 @@ bot.command('register', async context => {
 	context.replyWithMarkdown(`Successfully registered. Your account address is: \`${address}\`.\nMnemonic: \`${mnemonic}\`\nFor further use refer \`/help\` command.`)
 
 });
-// bot.command('withdraw', async context => return context.reply('hello'));
 
 bot.command('account', async context => {
 	const account = await getAccount(context.message.from.username!);
@@ -79,7 +82,7 @@ bot.command('tip', async context => {
 		return;
 	}
 	const tokens = Number(params[1]);
-	if (tokens === NaN){
+	if (isNaN(tokens)){
 		context.replyWithMarkdown(`Provide valid token amount.`);
 		return;
 	}
@@ -105,7 +108,7 @@ bot.command('withdraw', async context => {
 		return;
 	}
 	const tokens = Number(params[1]);
-	if (tokens === NaN){
+	if (isNaN(tokens)){
 		context.replyWithMarkdown(`Provide valid token amount.`);
 		return;
 	}
@@ -122,18 +125,97 @@ bot.command('withdraw', async context => {
 	}
 	context.replyWithMarkdown(`Withdraw successful.`);
 })
+
+// bot.command('setAccount', async context => {
+// 	redisClient.set(context.message.from.username!,context.message.text.split(' ').slice(1,).join(' '))
+// })
+
+bot.command('tipall', async context => {
+	if (context.message.chat.type != 'group'){
+		return context.replyWithMarkdown(`tipall command can be used in groups only.`);
+	}
+	var params = (context.message as any).text.split(' ');
+	if (params.length > 3) {
+		return context.replyWithMarkdown(`tipall accepts two arguments. Refer /help.`);
+	}
+	const tokens = Number(params[1]);
+	if (isNaN(tokens)){
+		return context.replyWithMarkdown(`Provide valid token amount.`);
+	}
+	var timeout = 24*60*60
+	if (params.length == 3) {
+		const timeString = params[2].split(':')
+		timeout = Number(timeString[0]) * 60 * 60
+		timeout += timeString.length > 1 ? Number(timeString[1]) * 60 : 0
+		timeout += timeString.length > 2 ? Number(timeString[2]) : 0
+	}
+	if (isNaN(timeout)){
+		context.replyWithMarkdown(`Provide valid time. Format hh(:mm)(:ss)`);
+		return;
+	}
+	if (timeout>48*60*60){
+		context.replyWithMarkdown(`Maximum timeout: 48 hrs`)
+	}
+	context.reply(
+	  `@${context.message.from.username} has issued a tip of ${tokens} DVPN for all the users. Claim yours with the button below`,
+	  Markup.inlineKeyboard([
+		Markup.button.callback('claim', 'claimTip'),
+	  ])
+	).then(res=>{
+		console.log("reply:", res)
+		const message_id = res.message_id.toString()
+		redisClient.hSet(message_id,'tipper',context.message.from.username!)
+		redisClient.hSet(message_id,'amount',tokens.toString())
+		setTimeout(()=>context.deleteMessage(res.message_id),timeout*1000)
+	})
+	return
+})
+
+bot.action('claimTip', async context => {
+	const username = context.update.callback_query.from.username
+	if (username == undefined){
+		return context.answerCbQuery("Your account needs a username for tipping. Please add a username to continue.");	
+	}
+	const message_id = context.update.callback_query.message!.message_id.toString()
+	const tipper = (await redisClient.hGet(message_id,'tipper'))!
+	const tokens = Number((await redisClient.hGet(message_id,'amount'))!)
+	console.log(message_id,tipper,tokens)
+	if (username == tipper){
+		return context.answerCbQuery("You can not claim your own tip.");	
+	}
+	if (await redisClient.SISMEMBER(message_id+"_tipped",username)){
+		return context.answerCbQuery("You have already claimed the tip")
+	}
+	console.log(message_id,tipper,tokens)
+	const recipientAccount = await getAccount(username);
+	if (recipientAccount === null){
+        context.answerCbQuery(`You has not registered with DvpnTipBot.`);
+        return;
+    }
+	console.log(message_id,tipper,tokens,recipientAccount)
+	const result = await transferTokens(tipper, recipientAccount!.address, tokens);
+	if ((result as any).code){
+		console.log(result.rawLog)
+		context.answerCbQuery(`Transaction failed: \`${result.rawLog}\`.`);
+		return;
+	}
+	await redisClient.sAdd(message_id+"_tipped",username)
+	return context.answerCbQuery(`Tip successfully claimed.`);
+})
+
 bot.catch(error => {
 	console.error('telegraf error occured: ', error);
 });
 
 async function start(): Promise<void> {
-	// The commandsu you set here will be shown as /commands like /start or /magic in your telegram client.
 	await bot.telegram.setMyCommands([
 		{command: 'start', description: 'open the menu'},
 		{command: 'help', description: 'view help'},
 		{command: 'tip', description: 'tip someone'},
+		{command: 'tipall', description: 'tip everyone'},
 		{command: 'withdraw', description: 'withdraw balance'},
 		{command: 'account', description: 'account details'},
+		{command: 'balance', description: 'account balance'},
 	]);
 
 	await bot.launch();

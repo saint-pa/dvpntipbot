@@ -17,6 +17,8 @@ services:
     environment:
       - BOT_TOKEN=$BOT_TOKEN
       - REDIS_URI=$REDIS_URI
+    # volumes:
+    #   - ./source:/build/source
 
 volumes:
   redis-data:
