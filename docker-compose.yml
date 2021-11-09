@@ -12,7 +12,7 @@ services:
       - redis-data:/data
   
   bot:
-    build: .
+    image: saintpa/dvpntipbot:latest
     command: npm run start
     environment:
       - BOT_TOKEN=$BOT_TOKEN

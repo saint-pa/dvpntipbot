@@ -46,7 +46,7 @@ bot.command('help', async context => {
 		/account : Get account address\n
 		/balance : Get account balance\n
 		/tip \`<tip_amount>\` \`<@user>\` : Tip user\n
-		/tipall \`<tip_amount>\` \`<timeout hh(:mm)(:ss) {default=24:00:00}>\` : Tip everyone in the group. Creates a button for claiming. \n
+		/tipall \`<tip_amount>\` \`<timeout hh(:mm)(:ss) {default=00:25:00}>\` : Tip everyone in the group. Creates a button for claiming. \n
 		/withdraw \`<withdraw_amount>\` \`<address>\` : Withdraw available balance to address\n
 	`)
 });
@@ -142,7 +142,7 @@ bot.command('tipall', async context => {
 	if (isNaN(tokens)){
 		return context.replyWithMarkdown(`Provide valid token amount.`);
 	}
-	var timeout = 24*60*60
+	var timeout = 25*60
 	if (params.length == 3) {
 		const timeString = params[2].split(':')
 		timeout = Number(timeString[0]) * 60 * 60
