@@ -20,7 +20,10 @@ const menuMiddleware = new MenuMiddleware('/', menu);
 bot.use(menuMiddleware.middleware());
 bot.use(generateUpdateMiddleware());
 bot.use(async (ctx, next) => {
-	if (ctx.message){
+	const ignoreMessages = ['new_chat_member', 'left_chat_member', 'new_chat_title'];
+	let shouldIgnore = ignoreMessages.some(x => x in ctx.message!);
+	
+	if (ctx.message && !shouldIgnore){
 		if(ctx.message.from.username == undefined){
 			ctx.reply("Your account needs a username for tipping. Please add a username to continue.");
 			return
