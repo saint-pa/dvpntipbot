@@ -140,6 +140,7 @@ bot.command("tip", async (context) => {
     tokens
   );
   if ((result as any).code) {
+    console.log(result.rawLog);
     context.replyWithMarkdown(`Transaction failed: \`${result.rawLog}\`.`);
     return;
   }
@@ -168,6 +169,7 @@ bot.command("withdraw", async (context) => {
   }
   const result = await transferTokens(username, recipientAddress, tokens);
   if ((result as any).code) {
+    console.log(result.rawLog);
     context.replyWithMarkdown(`Transaction failed: \`${result.rawLog}\`.`);
     return;
   }
@@ -224,7 +226,7 @@ bot.action("claimTip", async (context) => {
   const username = context.update.callback_query.from.username;
   if (username == undefined) {
     return context.answerCbQuery(
-      "Your account needs a username for tipping. Please add a username to continue."
+      "Your account needs a username to claim. Please add a username to continue."
     );
   }
   const message_id =
@@ -239,7 +241,7 @@ bot.action("claimTip", async (context) => {
   }
   const recipientAccount = await getAccount(username);
   if (recipientAccount === null) {
-    context.answerCbQuery(`You has not registered with DvpnTipBot.`);
+    context.answerCbQuery(`You are not registered with dvpntipbot.`);
     return;
   }
   const result = await transferTokens(
@@ -248,6 +250,7 @@ bot.action("claimTip", async (context) => {
     tokens
   );
   if ((result as any).code) {
+    console.log(result.rawLog);
     context.answerCbQuery(`Transaction failed: \`${result.rawLog}\`.`);
     return;
   }
