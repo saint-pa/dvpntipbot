@@ -9,7 +9,6 @@
 $ npm install
 ```
 
-
 ## Start the bot
 
 ### Local development

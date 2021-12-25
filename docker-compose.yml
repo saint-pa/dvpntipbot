@@ -1,4 +1,4 @@
-version: '3.7'
+version: "3.7"
 
 services:
   redis:
@@ -10,7 +10,7 @@ services:
       - REDIS_PASSWORD=$REDIS_PASSWORD
     volumes:
       - redis-data:/data
-  
+
   bot:
     image: saintpa/dvpntipbot:latest
     command: npm run start

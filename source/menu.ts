@@ -1,5 +1,5 @@
-import {MenuTemplate} from 'telegraf-inline-menu';
+import { MenuTemplate } from "telegraf-inline-menu";
 
-export const menu = new MenuTemplate('welcome to dvpntipbot');
+export const menu = new MenuTemplate("welcome to dvpntipbot");
 
-menu.url('Sentinel', 'https://sentinel.co');
+menu.url("Sentinel", "https://sentinel.co");
