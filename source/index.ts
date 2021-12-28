@@ -71,7 +71,7 @@ bot.command("help", async (context) => {
 		/register : Open new account (only DM)\n
 		/account : Get account address\n
 		/balance : Get account balance\n
-		/tip \`<tip_amount>\` \`<@user>\` : Tip user (eg. /tip 100 @memelord\n
+		/tip \`<tip_amount>\` \`<@user>\` : Tip user (eg. /tip 100 @dvpntipbot)\n
 		/tipall \`<tip_amount>\` \`<timeout hh(:mm)(:ss) {default=00:25:00}>\` : Tip everyone in the group. Creates a button for claiming. (eg. /tipall 100 1:30:00)\n
 		/withdraw \`<withdraw_amount>\` \`<address>\` : Withdraw available balance to address\n
 	`);
