@@ -55,7 +55,7 @@ bot.use(async (ctx, next) => {
       const account = await getAccount(ctx.message.from.username);
       if (account == null) {
         ctx.replyWithMarkdown(
-          `You are not registered. Use /register to open an account (use a private window with the bot).`
+          `You are not registered. Use /register to open an account (in DM).`
         );
         return;
       }
@@ -68,7 +68,7 @@ bot.use(async (ctx, next) => {
 bot.command("start", async (context) => menuMiddleware.replyToContext(context));
 bot.command("help", async (context) => {
   context.replyWithMarkdown(`DVPN Tip Bot\n
-		/register : Open new account\n
+		/register : Open new account (only DM)\n
 		/account : Get account address\n
 		/balance : Get account balance\n
 		/tip \`<tip_amount>\` \`<@user>\` : Tip user\n
@@ -78,6 +78,10 @@ bot.command("help", async (context) => {
 });
 
 bot.command("register", async (context) => {
+  if (context.message.chat.type == "group") {
+    context.replyWithMarkdown(`You can only run this command only in DM.`);
+    return;
+  }
   var account = await getAccount(context.message.from.username!);
   if (account != null) {
     context.replyWithMarkdown(
