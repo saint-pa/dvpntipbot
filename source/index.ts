@@ -1,7 +1,8 @@
 import { generateUpdateMiddleware } from "telegraf-middleware-console-time";
-import { MenuMiddleware } from "telegraf-inline-menu";
+// import { MenuMiddleware } from "telegraf-inline-menu";
 import { Telegraf, Markup } from "telegraf";
-import { menu } from "./menu.js";
+// import { menu } from "./menu.js";
+
 import {
   getAccount,
   createAccount,
@@ -21,9 +22,9 @@ if (!token) {
 const bot = new Telegraf(token);
 
 // middlewares
-const menuMiddleware = new MenuMiddleware("/", menu);
+// const menuMiddleware = new MenuMiddleware("/", menu);
+// bot.use(menuMiddleware.middleware());
 
-bot.use(menuMiddleware.middleware());
 bot.use(generateUpdateMiddleware());
 bot.use(async (ctx, next) => {
   const ignoreMessages = [
@@ -65,7 +66,15 @@ bot.use(async (ctx, next) => {
 });
 
 // commands
-bot.command("start", async (context) => menuMiddleware.replyToContext(context));
+bot.command("start", async (context) => {
+  context.replyWithMarkdown(`
+Hello, Welcome to DVPN Tip Bot\n
+Use /register in DM to register a wallet with the bot
+Use /help to get more information on each command\n
+Warning: Use this wallet ONLY as a HOT wallet (\`https://bit.ly/3nh0nIb\`) 
+	`);
+});
+
 bot.command("help", async (context) => {
   context.replyWithMarkdown(`DVPN Tip Bot\n
 		/register : Open new account (only DM)\n
@@ -270,7 +279,7 @@ bot.catch((error) => {
 
 async function start(): Promise<void> {
   await bot.telegram.setMyCommands([
-    { command: "start", description: "open the menu" },
+    { command: "start", description: "get started" },
     { command: "help", description: "view help" },
     { command: "register", description: "register (run in private)" },
     { command: "unregister", description: "unregister" },
