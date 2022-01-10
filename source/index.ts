@@ -1,8 +1,5 @@
 import { generateUpdateMiddleware } from "telegraf-middleware-console-time";
-// import { MenuMiddleware } from "telegraf-inline-menu";
-import { Telegraf, Markup } from "telegraf";
-// import { menu } from "./menu.js";
-
+import { Telegraf, Markup, Telegram } from "telegraf";
 import {
   getAccount,
   createAccount,
@@ -22,9 +19,6 @@ if (!token) {
 const bot = new Telegraf(token);
 
 // middlewares
-// const menuMiddleware = new MenuMiddleware("/", menu);
-// bot.use(menuMiddleware.middleware());
-
 bot.use(generateUpdateMiddleware());
 bot.use(async (ctx, next) => {
   const ignoreMessages = [
@@ -47,6 +41,7 @@ bot.use(async (ctx, next) => {
       "/balance",
       "/withdraw",
       "/tipall",
+      "/bet",
       "/unregister",
     ];
     if (
@@ -83,6 +78,9 @@ bot.command("help", async (context) => {
 		/tip \`<tip_amount>\` \`<@user>\` : Tip user (eg. /tip 100 @dvpntipbot)\n
 		/tipall \`<tip_amount>\` \`<timeout hh(:mm)(:ss) {default=00:25:00}>\` : Tip everyone in the group. Creates a button for claiming. (eg. /tipall 100 1:30:00)\n
 		/withdraw \`<withdraw_amount>\` \`<address>\` : Withdraw available balance to address\n
+		/bet open \`<amount>\` \`<timeout hh(:mm)(:ss)>\` : Open a bet\n
+		/bet accept \`<bet_id>\`: Accept a bet\n
+		/bet list: List all open bets
 	`);
 });
 
@@ -94,8 +92,7 @@ bot.command("register", async (context) => {
   var account = await getAccount(context.message.from.username!);
   if (account != null) {
     context.replyWithMarkdown(
-      `You are already registered with account address: \`${
-        account!.address
+      `You are already registered with account address: \`${account!.address
       }\`\nUse /unregister to unregister`
     );
     return;
@@ -116,8 +113,7 @@ bot.command("unregister", async (context) => {
 bot.command("account", async (context) => {
   const account = await getAccount(context.message.from.username!);
   context.replyWithMarkdown(
-    `Your account address is \`${
-      account!.address
+    `Your account address is \`${account!.address
     }\`.\nYou can use this to deposit DVPN.`
   );
 });
@@ -235,6 +231,156 @@ bot.command("tipall", async (context) => {
   return;
 });
 
+const formatTime = (seconds: number) => {
+  seconds = (seconds / 1000)
+  return [
+    Math.floor(seconds / 60 / 60),
+    Math.floor(seconds / 60 % 60),
+    Math.floor(seconds % 60)
+  ]
+    .join(":")
+    .replace(/\b(\d)\b/g, "0$1")
+}
+
+const concludeBet = async (context: any, betId: string) => {
+  redisClient.sRem('open_bets',betId)
+
+  const username = await redisClient.hGet(betId, 'username')
+  const amount = await redisClient.hGet(betId, 'amount')
+  const participants : {id:number,username:string}[] = JSON.parse((await redisClient.hGet(betId, 'participants'))!)
+  if (participants.length < 2){
+    return context.replyWithMarkdown(`Not enough participants for the bet with Id: ${betId}`)
+  }
+  const startMessage = await context.replyWithMarkdown(`Rolling dice for bet with ID: ${betId}. The winning numbers are:\n`+participants.map((mem,index)=>`${index+1} : @${mem.username}`).join('\n'))
+  var diceMessage = await context.replyWithDice()  
+  var diceRoll = diceMessage.dice.value - 1
+  while(diceRoll >= participants.length){
+    diceMessage = await context.replyWithDice()  
+    diceRoll = diceMessage.dice.value - 1
+  }
+
+  const winnerMessage = await context.replyWithMarkdown(`Winner of the ${amount} DVPN bet was @${participants[diceRoll]!.username}`)
+  const telegram = new Telegram(token)
+  for (var member of participants){
+    if (member.id != context.chat.id){
+      telegram.forwardMessage(member.id, context.chat.id, startMessage.message_id)
+      telegram.forwardMessage(member.id, context.chat.id, diceMessage.message_id)
+      telegram.forwardMessage(member.id, context.chat.id, winnerMessage.message_id)
+    }
+  }
+
+  if (participants[diceRoll]!.username != username){
+    const recipientAccount = await getAccount(participants[diceRoll]!.username);
+    const result = await transferTokens(
+      username!,
+      recipientAccount!.address,
+      parseFloat(amount!)
+    );
+    if ((result as any).code) {
+      console.log(result.rawLog);
+      context.replyWithMarkdown(`Transaction failed: \`${result.rawLog}\`.`);
+      return;
+    }
+    context.replyWithMarkdown(`Transaction of ${amount} DVPN successful. (Tx: ${result.transactionHash})`);
+  }
+  redisClient.hDel(betId,['username','chat_id','amount','expiry','participants'])
+
+}
+
+bot.command("bet", async (context) => {
+  var params = (context.message as any).text.split(" ");
+  const now = new Date().getTime()
+
+  if (params[1] == 'open') {
+    const betId = context.message.message_id.toString()
+
+    if (params.length > 4) {
+      return context.replyWithMarkdown(
+        `bet open accepts two arguments. Refer /help.`
+      );
+    }
+    const tokens = Number(params[2]);
+    if (isNaN(tokens)) {
+      return context.replyWithMarkdown(`Provide valid token amount.`);
+    }
+    var timeout = 30 * 60;
+    if (params.length == 4) {
+      const timeString = params[3].split(":");
+      timeout = Number(timeString[0]) * 60 * 60;
+      timeout += timeString.length > 1 ? Number(timeString[1]) * 60 : 0;
+      timeout += timeString.length > 2 ? Number(timeString[2]) : 0;
+    }
+
+    timeout = timeout * 1000
+
+    redisClient.sAdd('open_bets', betId)
+
+    redisClient.hSet(betId, "username", context.from.username!)
+    redisClient.hSet(betId, 'amount', tokens.toString())
+    redisClient.hSet(betId, 'expiry', (now + timeout).toString())
+    redisClient.hSet(betId, 'participants', JSON.stringify([
+      { id: context.from.id, username: context.from.username }
+    ]))
+
+    setTimeout(() => concludeBet(context, betId), timeout)
+    return context.replyWithMarkdown(`Bet successfully placed\nBet Id: ${betId}`)
+  }
+  else if (params[1] == 'accept') {
+    if (params.length > 3) {
+      return context.replyWithMarkdown(
+        `bet accept accepts one arguments. Refer /help.`
+      );
+    }
+    const betId = params[2]
+    const expiry = await redisClient.hGet(betId, 'expiry')
+    if (expiry && parseInt(expiry)>now){
+      const username = context.from.username!
+      const id = context.from.id!
+      let participants : {id:number,username:string}[] = JSON.parse((await redisClient.hGet(betId, 'participants'))!)
+      if (!participants.map(obj => obj.username).includes(username)){
+        participants.push({ id: id, username: username })
+        redisClient.hSet(betId, 'participants', JSON.stringify(participants))
+        return context.replyWithMarkdown(`Joined the bet successfully`)
+      }
+      else {
+        return context.replyWithMarkdown(`You are already a part of this bet.`);
+      }
+    }
+  }
+  else if (params[1] == 'list') {
+    const header = `Following are the open bets\n${'='.repeat(10)}\n`
+    let bets_info = []
+    const all_bets = await redisClient.sMembers('open_bets')
+    for (var betId of all_bets) {
+      const username = await redisClient.hGet(betId, 'username')
+      const amount = await redisClient.hGet(betId, 'amount')
+      const expiry = await redisClient.hGet(betId, 'expiry')
+      const participants = await redisClient.hGet(betId, 'participants')
+
+      if (expiry && parseInt(expiry) > now) {
+        const duration = (parseInt(expiry) - now)
+        bets_info.push(`\`Bet_ID\`: ${betId}\n\`User\`: @${username}\n\`Amount\`: ${amount}\n\`Expiry_in\`: ${formatTime(duration)}\n\`Participants\`: ${JSON.parse(participants!).length}/6`)
+      }
+    }
+    if (bets_info.length == 0 ){
+      return context.replyWithMarkdown(`There are no open bets`)
+    }
+    return context.replyWithMarkdown(header+bets_info.join(`\n${"-".repeat(15)}\n`))
+  }
+  else if (params[1] == 'close') {
+    const betId = params[2]
+    concludeBet(context, betId)
+  }
+  else {
+    return context.replyWithMarkdown(`Betting has three modes:
+    /bet open \`<amount>\` \`<timeout hh(:mm)(:ss)>\`
+    /bet accept \`<bet_id|username>\`
+    /bet list`
+    );
+  }
+  return
+});
+
 bot.action("claimTip", async (context) => {
   const username = context.update.callback_query.from.username;
   if (username == undefined) {
@@ -288,6 +434,7 @@ async function start(): Promise<void> {
     { command: "withdraw", description: "withdraw balance" },
     { command: "account", description: "account details" },
     { command: "balance", description: "account balance" },
+    { command: "bet", description: "place bets" },
   ]);
 
   await bot.launch();
