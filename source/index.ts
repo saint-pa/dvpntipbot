@@ -303,6 +303,10 @@ bot.command("bet", async (context) => {
     if (isNaN(tokens)) {
       return context.replyWithMarkdown(`Provide valid token amount.`);
     }
+    const balance = await getBalance(context.message.from.username!);
+    if (parseFloat(balance) < tokens){
+      return context.replyWithMarkdown(`You don't have enough tokens to place the bet`);
+    }
     var timeout = 30 * 60;
     if (params.length == 4) {
       const timeString = params[3].split(":");
@@ -333,6 +337,11 @@ bot.command("bet", async (context) => {
     }
     const betId = params[2]
     const expiry = await redisClient.hGet(betId, 'expiry')
+    const tokens = await redisClient.hGet(betId, 'amount')
+    const balance = await getBalance(context.message.from.username!);
+    if (parseFloat(balance) < parseFloat(tokens!)){
+      return context.replyWithMarkdown(`You don't have enough tokens to accept the bet`);
+    }
     if (expiry && parseInt(expiry)>now){
       const username = context.from.username!
       const id = context.from.id!
