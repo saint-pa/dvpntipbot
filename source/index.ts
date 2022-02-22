@@ -76,7 +76,7 @@ bot.command("help", async (context) => {
 		/account : Get account address\n
 		/balance : Get account balance\n
 		/tip \`<tip_amount>\` \`<@user>\` : Tip user (eg. /tip 100 @dvpntipbot)\n
-		/tipall \`<tip_amount>\` \`<timeout hh(:mm)(:ss) {default=00:25:00}>\` : Tip everyone in the group. Creates a button for claiming. (eg. /tipall 100 1:30:00)\n
+		/tipall \`<tip_amount>\` \`<timeout hh(:mm)(:ss) {default=00:25:00}>\` \`<tip_limit>\` : Tip everyone in the group. Creates a button for claiming. (eg. /tipall 100 1:30:00 1000)\n
 		/withdraw \`<withdraw_amount>\` \`<address>\` : Withdraw available balance to address\n
 		/bet open \`<amount>\` \`<timeout hh(:mm)(:ss)>\` : Open a bet\n
 		/bet accept \`<bet_id>\`: Accept a bet\n
@@ -194,7 +194,7 @@ bot.command("tipall", async (context) => {
     );
   }
   var params = (context.message as any).text.split(" ");
-  if (params.length > 3) {
+  if (params.length > 4) {
     return context.replyWithMarkdown(
       `tipall accepts two arguments. Refer /help.`
     );
@@ -204,7 +204,7 @@ bot.command("tipall", async (context) => {
     return context.replyWithMarkdown(`Provide valid token amount.`);
   }
   var timeout = 25 * 60;
-  if (params.length == 3) {
+  if (params.length > 2) {
     const timeString = params[2].split(":");
     timeout = Number(timeString[0]) * 60 * 60;
     timeout += timeString.length > 1 ? Number(timeString[1]) * 60 : 0;
@@ -217,15 +217,26 @@ bot.command("tipall", async (context) => {
   if (timeout > 48 * 60 * 60) {
     context.replyWithMarkdown(`Maximum timeout: 48 hrs`);
   }
+
+  var tokens_limit = -1
+  if (params.length > 3) {
+    tokens_limit = Number(params[3]);
+    if (isNaN(tokens_limit)) {
+      return context.replyWithMarkdown(`Provide valid token limit amount.`);
+    }
+  }
+
   context
     .reply(
-      `@${context.message.from.username} has issued a tip of ${tokens} DVPN for all the users. Claim yours with the button below`,
+      `@${context.message.from.username} has issued a tip of ${tokens} DVPN for all the users. Claim yours with the button below.` + (tokens_limit!=-1)? ` Max to claim is ${tokens_limit}`:"",
       Markup.inlineKeyboard([Markup.button.callback("claim", "claimTip")])
     )
     .then((res) => {
       const message_id = res.message_id.toString();
       redisClient.hSet(message_id, "tipper", context.message.from.username!);
       redisClient.hSet(message_id, "amount", tokens.toString());
+      redisClient.hSet(message_id, "token_limit", tokens_limit.toString());
+      redisClient.hSet(message_id, "claimed", "0");
       setTimeout(() => context.deleteMessage(res.message_id), timeout * 1000);
     });
   return;
@@ -401,6 +412,7 @@ bot.action("claimTip", async (context) => {
     context.update.callback_query.message!.message_id.toString();
   const tipper = (await redisClient.hGet(message_id, "tipper"))!;
   const tokens = Number((await redisClient.hGet(message_id, "amount"))!);
+  const tokens_limit = await redisClient.hGet(message_id, "token_limit")
   if (username == tipper) {
     return context.answerCbQuery("You can not claim your own tip.");
   }
@@ -411,6 +423,15 @@ bot.action("claimTip", async (context) => {
   if (recipientAccount === null) {
     context.answerCbQuery(`You are not registered with dvpntipbot.`);
     return;
+  }
+  if (tokens_limit) {
+    const claimed = await redisClient.HINCRBY(message_id, "claimed", 1)
+    console.log(claimed)
+    if (tokens != -1 && tokens * claimed > Number(tokens_limit)){
+      return context.answerCbQuery(
+        "Tokens limit reached."
+      );
+    }
   }
   const result = await transferTokens(
     tipper,
