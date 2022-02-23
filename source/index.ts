@@ -41,6 +41,7 @@ bot.use(async (ctx, next) => {
       "/balance",
       "/withdraw",
       "/tipall",
+      "/makeitrain",
       "/bet",
       "/unregister",
     ];
@@ -77,6 +78,7 @@ bot.command("help", async (context) => {
 		/balance : Get account balance\n
 		/tip \`<tip_amount>\` \`<@user>\` : Tip user (eg. /tip 100 @dvpntipbot)\n
 		/tipall \`<tip_amount>\` \`<timeout hh(:mm)(:ss) {default=00:25:00}>\` \`<tip_limit>\` : Tip everyone in the group. Creates a button for claiming. (eg. /tipall 100 1:30:00 1000)\n
+		/makeitrain \`<no of users>\` \`<tip_amount_per_user>\` : Tip random registered users. (eg. /makeitrain 5 10)\n
 		/withdraw \`<withdraw_amount>\` \`<address>\` : Withdraw available balance to address\n
 		/bet open \`<amount>\` \`<timeout hh(:mm)(:ss)>\` : Open a bet\n
 		/bet accept \`<bet_id>\`: Accept a bet\n
@@ -228,7 +230,7 @@ bot.command("tipall", async (context) => {
 
   context
     .reply(
-      `@${context.message.from.username} has issued a tip of ${tokens} DVPN for all the users. Claim yours with the button below.` + (tokens_limit!=-1)? ` Max to claim is ${tokens_limit}`:"",
+      `@${context.message.from.username} has issued a tip of ${tokens} DVPN for all the users. Claim yours with the button below.` + ((tokens_limit!=-1)? ` Pool limit is ${tokens_limit} DVPN`:""),
       Markup.inlineKeyboard([Markup.button.callback("claim", "claimTip")])
     )
     .then((res) => {
@@ -240,6 +242,54 @@ bot.command("tipall", async (context) => {
       setTimeout(() => context.deleteMessage(res.message_id), timeout * 1000);
     });
   return;
+});
+
+bot.command("makeitrain", async (context) => {
+  var params = (context.message as any).text.split(" ");
+  if (params.length != 3) {
+    context.replyWithMarkdown(`makeitrain command requires two arguments. Refer /help.`);
+    return;
+  }
+  const tokens = Number(params[2]);
+  if (isNaN(tokens)) {
+    context.replyWithMarkdown(`Provide valid token amount.`);
+    return;
+  }
+  const users = Number(params[1]);
+  var userList: { [id: string] : string } = {}
+  var number_of_tries = 0
+  while (Object.keys(userList).length<users) {
+    try {
+      number_of_tries+=1
+      if (number_of_tries>users*100){
+        context.replyWithMarkdown(`Couldn't find enough users`);
+        return;
+      }
+      const user_key = (await redisClient.randomKey())!
+      const mnemonic = (await redisClient.get(user_key))!
+      if (!(user_key in userList) && [12,24].includes(mnemonic.split(" ").length)){
+        const recipientAccount = await getAccount(user_key);
+        if (recipientAccount !== null) {
+          userList[user_key!] = recipientAccount!.address!
+        }
+      }
+    }
+    catch { }
+  }
+  context.replyWithMarkdown(`Users being tipped ${tokens} DVPN:\n\`${Object.keys(userList).join('\n')}\``);
+  const username = context.message?.from?.username!;
+  for (var user_key in userList){
+    const result = await transferTokens(
+      username,
+      userList[user_key]!,
+      tokens
+    );
+    if ((result as any).code) {
+      console.log(result.rawLog);
+      context.replyWithMarkdown(`Transaction failed to @${user_key}: \`${result.rawLog}\`.`);
+    }
+    context.replyWithMarkdown(`Tip successful to @${user_key}. (Tx: ${result.transactionHash})`);
+  }
 });
 
 const formatTime = (seconds: number) => {
@@ -461,6 +511,7 @@ async function start(): Promise<void> {
     { command: "unregister", description: "unregister" },
     { command: "tip", description: "tip someone" },
     { command: "tipall", description: "tip everyone" },
+    { command: "makeitrain", description: "tip random registered users" },
     { command: "withdraw", description: "withdraw balance" },
     { command: "account", description: "account details" },
     { command: "balance", description: "account balance" },
