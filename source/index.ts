@@ -474,7 +474,7 @@ bot.action("claimTip", async (context) => {
     context.answerCbQuery(`You are not registered with dvpntipbot.`);
     return;
   }
-  if (tokens_limit) {
+  if (tokens_limit && Number(tokens_limit) != -1) {
     const claimed = await redisClient.HINCRBY(message_id, "claimed", 1)
     console.log(claimed)
     if (tokens != -1 && tokens * claimed > Number(tokens_limit)) {
