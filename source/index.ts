@@ -230,7 +230,7 @@ bot.command("tipall", async (context) => {
 
   context
     .reply(
-      `@${context.message.from.username} has issued a tip of ${tokens} DVPN for all the users. Claim yours with the button below.` + ((tokens_limit!=-1)? ` Pool limit is ${tokens_limit} DVPN`:""),
+      `@${context.message.from.username} has issued a tip of ${tokens} DVPN for all the users. Claim yours with the button below.` + ((tokens_limit != -1) ? ` Pool limit is ${tokens_limit} DVPN` : ""),
       Markup.inlineKeyboard([Markup.button.callback("claim", "claimTip")])
     )
     .then((res) => {
@@ -256,18 +256,18 @@ bot.command("makeitrain", async (context) => {
     return;
   }
   const users = Number(params[1]);
-  var userList: { [id: string] : string } = {}
+  var userList: { [id: string]: string } = {}
   var number_of_tries = 0
-  while (Object.keys(userList).length<users) {
+  while (Object.keys(userList).length < users) {
     try {
-      number_of_tries+=1
-      if (number_of_tries>users*100){
+      number_of_tries += 1
+      if (number_of_tries > users * 100) {
         context.replyWithMarkdown(`Couldn't find enough users`);
         return;
       }
       const user_key = (await redisClient.randomKey())!
       const mnemonic = (await redisClient.get(user_key))!
-      if (!(user_key in userList) && [12,24].includes(mnemonic.split(" ").length)){
+      if (!(user_key in userList) && [12, 24].includes(mnemonic.split(" ").length)) {
         const recipientAccount = await getAccount(user_key);
         if (recipientAccount !== null) {
           userList[user_key!] = recipientAccount!.address!
@@ -278,7 +278,7 @@ bot.command("makeitrain", async (context) => {
   }
   context.replyWithMarkdown(`Users being tipped ${tokens} DVPN:\n\`${Object.keys(userList).join('\n')}\``);
   const username = context.message?.from?.username!;
-  for (var user_key in userList){
+  for (var user_key in userList) {
     const result = await transferTokens(
       username,
       userList[user_key]!,
@@ -304,33 +304,33 @@ const formatTime = (seconds: number) => {
 }
 
 const concludeBet = async (context: any, betId: string) => {
-  redisClient.sRem('open_bets',betId)
+  redisClient.sRem('open_bets', betId)
 
   const username = await redisClient.hGet(betId, 'username')
   const amount = await redisClient.hGet(betId, 'amount')
-  const participants : {id:number,username:string}[] = JSON.parse((await redisClient.hGet(betId, 'participants'))!)
-  if (participants.length < 2){
+  const participants: { id: number, username: string }[] = JSON.parse((await redisClient.hGet(betId, 'participants'))!)
+  if (participants.length < 2) {
     return context.replyWithMarkdown(`Not enough participants for the bet with Id: ${betId}`)
   }
-  const startMessage = await context.replyWithMarkdown(`Rolling dice for bet with ID: ${betId}. The winning numbers are:\n`+participants.map((mem,index)=>`${index+1} : @${mem.username}`).join('\n'))
-  var diceMessage = await context.replyWithDice()  
+  const startMessage = await context.replyWithMarkdown(`Rolling dice for bet with ID: ${betId}. The winning numbers are:\n` + participants.map((mem, index) => `${index + 1} : @${mem.username}`).join('\n'))
+  var diceMessage = await context.replyWithDice()
   var diceRoll = diceMessage.dice.value - 1
-  while(diceRoll >= participants.length){
-    diceMessage = await context.replyWithDice()  
+  while (diceRoll >= participants.length) {
+    diceMessage = await context.replyWithDice()
     diceRoll = diceMessage.dice.value - 1
   }
 
   const winnerMessage = await context.replyWithMarkdown(`Winner of the ${amount} DVPN bet was @${participants[diceRoll]!.username}`)
   const telegram = new Telegram(token)
-  for (var member of participants){
-    if (member.id != context.chat.id){
+  for (var member of participants) {
+    if (member.id != context.chat.id) {
       telegram.forwardMessage(member.id, context.chat.id, startMessage.message_id)
       telegram.forwardMessage(member.id, context.chat.id, diceMessage.message_id)
       telegram.forwardMessage(member.id, context.chat.id, winnerMessage.message_id)
     }
   }
 
-  if (participants[diceRoll]!.username != username){
+  if (participants[diceRoll]!.username != username) {
     const recipientAccount = await getAccount(participants[diceRoll]!.username);
     const result = await transferTokens(
       username!,
@@ -344,7 +344,7 @@ const concludeBet = async (context: any, betId: string) => {
     }
     context.replyWithMarkdown(`Transaction of ${amount} DVPN successful. (Tx: ${result.transactionHash})`);
   }
-  redisClient.hDel(betId,['username','chat_id','amount','expiry','participants'])
+  redisClient.hDel(betId, ['username', 'chat_id', 'amount', 'expiry', 'participants'])
 
 }
 
@@ -365,7 +365,7 @@ bot.command("bet", async (context) => {
       return context.replyWithMarkdown(`Provide valid token amount.`);
     }
     const balance = await getBalance(context.message.from.username!);
-    if (parseFloat(balance) < tokens){
+    if (parseFloat(balance) < tokens) {
       return context.replyWithMarkdown(`You don't have enough tokens to place the bet`);
     }
     var timeout = 30 * 60;
@@ -400,14 +400,14 @@ bot.command("bet", async (context) => {
     const expiry = await redisClient.hGet(betId, 'expiry')
     const tokens = await redisClient.hGet(betId, 'amount')
     const balance = await getBalance(context.message.from.username!);
-    if (parseFloat(balance) < parseFloat(tokens!)){
+    if (parseFloat(balance) < parseFloat(tokens!)) {
       return context.replyWithMarkdown(`You don't have enough tokens to accept the bet`);
     }
-    if (expiry && parseInt(expiry)>now){
+    if (expiry && parseInt(expiry) > now) {
       const username = context.from.username!
       const id = context.from.id!
-      let participants : {id:number,username:string}[] = JSON.parse((await redisClient.hGet(betId, 'participants'))!)
-      if (!participants.map(obj => obj.username).includes(username)){
+      let participants: { id: number, username: string }[] = JSON.parse((await redisClient.hGet(betId, 'participants'))!)
+      if (!participants.map(obj => obj.username).includes(username)) {
         participants.push({ id: id, username: username })
         redisClient.hSet(betId, 'participants', JSON.stringify(participants))
         return context.replyWithMarkdown(`Joined the bet successfully`)
@@ -432,10 +432,10 @@ bot.command("bet", async (context) => {
         bets_info.push(`\`Bet_ID\`: ${betId}\n\`User\`: @${username}\n\`Amount\`: ${amount}\n\`Expiry_in\`: ${formatTime(duration)}\n\`Participants\`: ${JSON.parse(participants!).length}/6`)
       }
     }
-    if (bets_info.length == 0 ){
+    if (bets_info.length == 0) {
       return context.replyWithMarkdown(`There are no open bets`)
     }
-    return context.replyWithMarkdown(header+bets_info.join(`\n${"-".repeat(15)}\n`))
+    return context.replyWithMarkdown(header + bets_info.join(`\n${"-".repeat(15)}\n`))
   }
   else if (params[1] == 'close') {
     const betId = params[2]
@@ -477,7 +477,7 @@ bot.action("claimTip", async (context) => {
   if (tokens_limit) {
     const claimed = await redisClient.HINCRBY(message_id, "claimed", 1)
     console.log(claimed)
-    if (tokens != -1 && tokens * claimed > Number(tokens_limit)){
+    if (tokens != -1 && tokens * claimed > Number(tokens_limit)) {
       return context.answerCbQuery(
         "Tokens limit reached."
       );
