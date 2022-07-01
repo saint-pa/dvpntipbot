@@ -12,7 +12,7 @@
     "node": ">=14"
   },
   "dependencies": {
-    "@cosmjs/proto-signing": "^0.26.4",
+    "@cosmjs/proto-signing": "^0.28.10",
     "@cosmjs/stargate": "^0.26.4",
     "@types/redis": "^2.8.32",
     "dotenv": "^10.0.0",
